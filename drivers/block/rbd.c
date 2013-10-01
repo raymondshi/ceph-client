@@ -510,30 +510,14 @@ static void rbd_release(struct gendisk *disk, fmode_t mode)
 
 static int rbd_ioctl_set_ro(struct rbd_device *rbd_dev, unsigned long arg)
 {
+	int ret = 0;
 	int val;
 	bool ro;
+	bool ro_changed = false;
 
+	/* get_user() may sleep, so call it before taking rbd_dev->lock */
 	if (get_user(val, (int __user *)(arg)))
 		return -EFAULT;
-
-	ro = val ? true : false;
-	/* Snapshot doesn't allow to write*/
-	if (rbd_dev->spec->snap_id != CEPH_NOSNAP && !ro)
-		return -EROFS;
-
-	if (rbd_dev->mapping.read_only != ro) {
-		rbd_dev->mapping.read_only = ro;
-		set_disk_ro(rbd_dev->disk, ro ? 1 : 0);
-	}
-
-	return 0;
-}
-
-static int rbd_ioctl(struct block_device *bdev, fmode_t mode,
-			unsigned int cmd, unsigned long arg)
-{
-	struct rbd_device *rbd_dev = bdev->bd_disk->private_data;
-	int ret = 0;
 
 	spin_lock_irq(&rbd_dev->lock);
 	/* prevent others open this device */
@@ -541,6 +525,34 @@ static int rbd_ioctl(struct block_device *bdev, fmode_t mode,
 		ret = -EBUSY;
 		goto out;
 	}
+
+	ro = val ? true : false;
+	/* Snapshot doesn't allow to write*/
+	if (rbd_dev->spec->snap_id != CEPH_NOSNAP && !ro) {
+		ret = -EROFS;
+		goto out;
+	}
+
+	if (rbd_dev->mapping.read_only != ro) {
+		rbd_dev->mapping.read_only = ro;
+		ro_changed = true;
+	}
+
+out:
+	spin_unlock_irq(&rbd_dev->lock);
+	/* set_disk_ro() may sleep, so call it after releasing rbd_dev->lock */
+	if (ret == 0 && ro_changed)
+		set_disk_ro(rbd_dev->disk, ro ? 1 : 0);
+
+
+	return ret;
+}
+
+static int rbd_ioctl(struct block_device *bdev, fmode_t mode,
+			unsigned int cmd, unsigned long arg)
+{
+	struct rbd_device *rbd_dev = bdev->bd_disk->private_data;
+	int ret = 0;
 
 	switch (cmd) {
 	case BLKROSET:
@@ -550,8 +562,6 @@ static int rbd_ioctl(struct block_device *bdev, fmode_t mode,
 		ret = -ENOTTY;
 	}
 
-out:
-	spin_unlock_irq(&rbd_dev->lock);
 	return ret;
 }
 
