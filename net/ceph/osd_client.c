@@ -761,7 +761,7 @@ struct ceph_osd_request *ceph_osdc_new_request(struct ceph_osd_client *osdc,
 	if (!req)
 		return ERR_PTR(-ENOMEM);
 
-	req->r_flags = flags;
+	req->r_flags = flags | CEPH_OSD_FLAG_KNOWN_REDIR;
 
 	/* calculate max write size */
 	r = calc_layout(layout, off, plen, &objnum, &objoff, &objlen);
@@ -1773,6 +1773,8 @@ static void handle_reply(struct ceph_osd_client *osdc, struct ceph_msg *msg,
 		__unregister_request(osdc, req);
 
 		req->r_target_oloc = redir.oloc; /* struct */
+
+		req->r_flags |= CEPH_OSD_FLAG_REDIRECTED;
 
 		/*
 		 * Start redirect requests with nofail=true.  If
