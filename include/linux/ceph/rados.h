@@ -321,7 +321,7 @@ static inline int ceph_osd_op_mode_modify(int op)
 
 /*
  * note that the following tmap stuff is also defined in the ceph librados.h
- * any modification here needs to be updated there
+ * and objclass.h. Any modification here needs to be updated there
  */
 #define CEPH_OSD_TMAP_HDR 'h'
 #define CEPH_OSD_TMAP_SET 's'
@@ -354,8 +354,14 @@ enum {
 	CEPH_OSD_FLAG_RWORDERED =      0x4000,  /* order wrt concurrent reads */
 	CEPH_OSD_FLAG_IGNORE_CACHE =   0x8000,  /* ignore cache logic */
 	CEPH_OSD_FLAG_SKIPRWLOCKS =   0x10000,  /* skip rw locks */
-	CEPH_OSD_FLAG_IGNORE_OVERLAY = 0x20000, /* ignore pool overlay */
+	CEPH_OSD_FLAG_IGNORE_OVERLAY =0x20000,  /* ignore pool overlay */
 	CEPH_OSD_FLAG_FLUSH =         0x40000,  /* this is part of flush */
+	CEPH_OSD_FLAG_MAP_SNAP_CLONE =0x80000,  /* map snap direct to clone id
+						 */
+	CEPH_OSD_FLAG_ENFORCE_SNAPC    =0x100000,  /* use snapc provided even if
+						      pool uses pool snaps */
+	CEPH_OSD_FLAG_REDIRECTED   = 0x200000,  /* op has been redirected */
+	CEPH_OSD_FLAG_KNOWN_REDIR = 0x400000,  /* redirect bit is authoritative */
 };
 
 enum {
@@ -390,7 +396,7 @@ enum {
  */
 struct ceph_osd_op {
 	__le16 op;           /* CEPH_OSD_OP_* */
-	__le32 flags;        /* CEPH_OSD_OP_FLAG_* */
+	__le32 flags;        /* CEPH_OSD_FLAG_* */
 	union {
 		struct {
 			__le64 offset, length;
