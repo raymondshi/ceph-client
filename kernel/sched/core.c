@@ -2190,6 +2190,7 @@ prepare_task_switch(struct rq *rq, struct task_struct *prev,
  * finish_task_switch - clean up after a task-switch
  * @rq: runqueue associated with task-switch
  * @prev: the thread we just switched away from.
+ * @prev_state: the state of @prev before we switched away from it.
  *
  * finish_task_switch must be called after the context switch, paired
  * with a prepare_task_switch call before the context switch.
@@ -2201,26 +2202,14 @@ prepare_task_switch(struct rq *rq, struct task_struct *prev,
  * with the lock held can cause deadlocks; see schedule() for
  * details.)
  */
-static void finish_task_switch(struct rq *rq, struct task_struct *prev)
+static void
+finish_task_switch(struct rq *rq, struct task_struct *prev, long prev_state)
 	__releases(rq->lock)
 {
 	struct mm_struct *mm = rq->prev_mm;
-	long prev_state;
 
 	rq->prev_mm = NULL;
 
-	/*
-	 * A task struct has one reference for the use as "current".
-	 * If a task dies, then it sets TASK_DEAD in tsk->state and calls
-	 * schedule one last time. The schedule call will never return, and
-	 * the scheduled task must drop that reference.
-	 * The test for TASK_DEAD must occur while the runqueue locks are
-	 * still held, otherwise prev could be scheduled on another cpu, die
-	 * there before we look at prev->state, and then the reference would
-	 * be dropped twice.
-	 *		Manfred Spraul <manfred@colorfullife.com>
-	 */
-	prev_state = prev->state;
 	vtime_task_switch(prev);
 	finish_arch_switch(prev);
 	perf_event_task_sched_in(prev, current);
@@ -2279,7 +2268,7 @@ asmlinkage __visible void schedule_tail(struct task_struct *prev)
 {
 	struct rq *rq = this_rq();
 
-	finish_task_switch(rq, prev);
+	finish_task_switch(rq, prev, 0);
 
 	/*
 	 * FIXME: do we need to worry about rq being invalidated by the
@@ -2304,6 +2293,21 @@ context_switch(struct rq *rq, struct task_struct *prev,
 	       struct task_struct *next)
 {
 	struct mm_struct *mm, *oldmm;
+	/*
+	 * A task struct has one reference for the use as "current".
+	 * If a task dies, then it sets TASK_DEAD in tsk->state and calls
+	 * schedule one last time. The schedule call will never return, and
+	 * the scheduled task must drop that reference.
+	 *
+	 * We must observe prev->state before clearing prev->on_cpu (in
+	 * finish_lock_switch), otherwise a concurrent wakeup can get prev
+	 * running on another CPU and we could race with its RUNNING -> DEAD
+	 * transition, and then the reference would be dropped twice.
+	 *
+	 * We avoid the race by observing prev->state while it is still
+	 * current.
+	 */
+	long prev_state = prev->state;
 
 	prepare_task_switch(rq, prev, next);
 
@@ -2347,7 +2351,7 @@ context_switch(struct rq *rq, struct task_struct *prev,
 	 * CPUs since it called schedule(), thus the 'rq' on its stack
 	 * frame will be invalid.
 	 */
-	finish_task_switch(this_rq(), prev);
+	finish_task_switch(this_rq(), prev, prev_state);
 }
 
 /*
