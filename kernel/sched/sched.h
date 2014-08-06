@@ -17,6 +17,7 @@ struct rq;
 
 /* task_struct::on_rq states: */
 #define ONRQ_QUEUED	1
+#define ONRQ_MIGRATING	2
 
 extern __read_mostly int scheduler_running;
 
@@ -948,6 +949,11 @@ static inline int task_running(struct rq *rq, struct task_struct *p)
 static inline int task_queued(struct task_struct *p)
 {
 	return p->on_rq == ONRQ_QUEUED;
+}
+
+static inline int task_migrating(struct task_struct *p)
+{
+	return p->on_rq == ONRQ_MIGRATING;
 }
 
 #ifndef prepare_arch_switch

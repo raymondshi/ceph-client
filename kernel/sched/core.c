@@ -331,9 +331,13 @@ static inline struct rq *__task_rq_lock(struct task_struct *p)
 	lockdep_assert_held(&p->pi_lock);
 
 	for (;;) {
+		while (unlikely(task_migrating(p)))
+			cpu_relax();
+
 		rq = task_rq(p);
 		raw_spin_lock(&rq->lock);
-		if (likely(rq == task_rq(p)))
+		if (likely(rq == task_rq(p) &&
+			   !task_migrating(p)))
 			return rq;
 		raw_spin_unlock(&rq->lock);
 	}
@@ -349,10 +353,14 @@ static struct rq *task_rq_lock(struct task_struct *p, unsigned long *flags)
 	struct rq *rq;
 
 	for (;;) {
+		while (unlikely(task_migrating(p)))
+			cpu_relax();
+
 		raw_spin_lock_irqsave(&p->pi_lock, *flags);
 		rq = task_rq(p);
 		raw_spin_lock(&rq->lock);
-		if (likely(rq == task_rq(p)))
+		if (likely(rq == task_rq(p) &&
+			   !task_migrating(p)))
 			return rq;
 		raw_spin_unlock(&rq->lock);
 		raw_spin_unlock_irqrestore(&p->pi_lock, *flags);
@@ -1684,7 +1692,7 @@ try_to_wake_up(struct task_struct *p, unsigned int state, int wake_flags)
 	success = 1; /* we're going to change ->state */
 	cpu = task_cpu(p);
 
-	if (task_queued(p) && ttwu_remote(p, wake_flags))
+	if (p->on_rq && ttwu_remote(p, wake_flags))
 		goto stat;
 
 #ifdef CONFIG_SMP
