@@ -15,6 +15,9 @@
 
 struct rq;
 
+/* task_struct::on_rq states: */
+#define ONRQ_QUEUED	1
+
 extern __read_mostly int scheduler_running;
 
 extern unsigned long calc_load_update;
@@ -942,6 +945,10 @@ static inline int task_running(struct rq *rq, struct task_struct *p)
 #endif
 }
 
+static inline int task_queued(struct task_struct *p)
+{
+	return p->on_rq == ONRQ_QUEUED;
+}
 
 #ifndef prepare_arch_switch
 # define prepare_arch_switch(next)	do { } while (0)
