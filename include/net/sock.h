@@ -886,6 +886,7 @@ static inline void sock_rps_reset_rxhash(struct sock *sk)
 		if (!__rc) {						\
 			*(__timeo) = schedule_timeout(*(__timeo));	\
 		}							\
+		__set_current_state(TASK_RUNNING);			\
 		lock_sock(__sk);					\
 		__rc = __condition;					\
 		__rc;							\
