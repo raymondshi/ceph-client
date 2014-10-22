@@ -79,6 +79,24 @@ int ceph_crypto_key_unarmor(struct ceph_crypto_key *key, const char *inkey)
 	return 0;
 }
 
+/*
+ * Should be used for buffers allocated with ceph_kvmalloc(), that is
+ * encrypt out-buffer (ceph_buffer) and decrypt in-buffer (msg front).
+ */
+static void ceph_init_kvmalloc_sg(struct scatterlist *sg,
+				  const void *buf, size_t len)
+{
+	const void *sg_buf;
+
+	if (is_vmalloc_addr(buf))
+		sg_buf = page_address(vmalloc_to_page(buf)) +
+						offset_in_page(buf);
+	else
+		sg_buf = buf;
+
+	sg_init_one(sg, sg_buf, len);
+}
+
 
 
 #define AES_KEY_SIZE 16
@@ -114,8 +132,7 @@ static int ceph_aes_encrypt(const void *key, int key_len,
 	sg_init_table(sg_in, 2);
 	sg_set_buf(&sg_in[0], src, src_len);
 	sg_set_buf(&sg_in[1], pad, zero_padding);
-	sg_init_table(sg_out, 1);
-	sg_set_buf(sg_out, dst, *dst_len);
+	ceph_init_kvmalloc_sg(sg_out, dst, *dst_len);
 	iv = crypto_blkcipher_crt(tfm)->iv;
 	ivsize = crypto_blkcipher_ivsize(tfm);
 
@@ -166,8 +183,7 @@ static int ceph_aes_encrypt2(const void *key, int key_len, void *dst,
 	sg_set_buf(&sg_in[0], src1, src1_len);
 	sg_set_buf(&sg_in[1], src2, src2_len);
 	sg_set_buf(&sg_in[2], pad, zero_padding);
-	sg_init_table(sg_out, 1);
-	sg_set_buf(sg_out, dst, *dst_len);
+	ceph_init_kvmalloc_sg(sg_out, dst, *dst_len);
 	iv = crypto_blkcipher_crt(tfm)->iv;
 	ivsize = crypto_blkcipher_ivsize(tfm);
 
@@ -211,9 +227,8 @@ static int ceph_aes_decrypt(const void *key, int key_len,
 		return PTR_ERR(tfm);
 
 	crypto_blkcipher_setkey((void *)tfm, key, key_len);
-	sg_init_table(sg_in, 1);
+	ceph_init_kvmalloc_sg(sg_in, src, src_len);
 	sg_init_table(sg_out, 2);
-	sg_set_buf(sg_in, src, src_len);
 	sg_set_buf(&sg_out[0], dst, *dst_len);
 	sg_set_buf(&sg_out[1], pad, sizeof(pad));
 
@@ -271,8 +286,7 @@ static int ceph_aes_decrypt2(const void *key, int key_len,
 	if (IS_ERR(tfm))
 		return PTR_ERR(tfm);
 
-	sg_init_table(sg_in, 1);
-	sg_set_buf(sg_in, src, src_len);
+	ceph_init_kvmalloc_sg(sg_in, src, src_len);
 	sg_init_table(sg_out, 3);
 	sg_set_buf(&sg_out[0], dst1, *dst1_len);
 	sg_set_buf(&sg_out[1], dst2, *dst2_len);
