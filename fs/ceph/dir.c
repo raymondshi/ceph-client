@@ -183,7 +183,7 @@ more:
 	spin_unlock(&parent->d_lock);
 
 	/* make sure a dentry wasn't dropped while we didn't have parent lock */
-	if (!ceph_dir_is_complete(dir)) {
+	if (!ceph_dir_is_complete_ordered(dir)) {
 		dout(" lost dir complete on %p; falling back to mds\n", dir);
 		dput(dentry);
 		err = -EAGAIN;
@@ -289,7 +289,7 @@ static int ceph_readdir(struct file *file, struct dir_context *ctx)
 	if ((ctx->pos == 2 || fi->dentry) &&
 	    !ceph_test_mount_opt(fsc, NOASYNCREADDIR) &&
 	    ceph_snap(inode) != CEPH_SNAPDIR &&
-	    __ceph_dir_is_complete(ci) &&
+	    __ceph_dir_is_complete_ordered(ci) &&
 	    __ceph_caps_issued_mask(ci, CEPH_CAP_FILE_SHARED, 1)) {
 		u32 shared_gen = ci->i_shared_gen;
 		spin_unlock(&ci->i_ceph_lock);

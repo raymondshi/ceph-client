@@ -1206,8 +1206,8 @@ retry_lookup:
 			ceph_invalidate_dentry_lease(dn);
 
 			/* d_move screws up sibling dentries' offsets */
-			ceph_dir_clear_complete(dir);
-			ceph_dir_clear_complete(olddir);
+			ceph_dir_clear_ordered(dir);
+			ceph_dir_clear_ordered(olddir);
 
 			dout("dn %p gets new offset %lld\n", req->r_old_dentry,
 			     ceph_dentry(req->r_old_dentry)->offset);
@@ -1235,7 +1235,7 @@ retry_lookup:
 
 		/* attach proper inode */
 		if (!dn->d_inode) {
-			ceph_dir_clear_complete(dir);
+			ceph_dir_clear_ordered(dir);
 			ihold(in);
 			dn = splice_dentry(dn, in, &have_lease);
 			if (IS_ERR(dn)) {
@@ -1265,7 +1265,7 @@ retry_lookup:
 		BUG_ON(!dir);
 		BUG_ON(ceph_snap(dir) != CEPH_SNAPDIR);
 		dout(" linking snapped dir %p to dn %p\n", in, dn);
-		ceph_dir_clear_complete(dir);
+		ceph_dir_clear_ordered(dir);
 		ihold(in);
 		dn = splice_dentry(dn, in, NULL);
 		if (IS_ERR(dn)) {
